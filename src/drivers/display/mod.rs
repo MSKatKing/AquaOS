@@ -1,38 +1,144 @@
 pub mod vga_textmode;
 
-use crate::drivers::display::vga_textmode::VGABufferWriter;
+use core::fmt::Write;
+use crate::drivers::display::vga_textmode::{VGABufferWriter, VgaColor};
 
 pub enum VideoModes {
-    VgaTextmode(VGABufferWriter)
+    VgaTextmode(VGABufferWriter),
+    Uninitialized
 }
 
-pub static mut VIDEO_MODE: VideoModes = VideoModes::VgaTextmode(VGABufferWriter::new());
+impl VideoModes {
+    pub fn set_color(&mut self, fg: VgaColor, bg: VgaColor) {
+        match self {
+            VideoModes::VgaTextmode(writer) => writer.set_color(fg, bg),
+            VideoModes::Uninitialized => {}
+        }
+    }
+}
+
+impl Write for VideoModes {
+    fn write_str(&mut self, args: &str) -> core::fmt::Result {
+        match self {
+            VideoModes::VgaTextmode(writer) => writer.write_str(args),
+            VideoModes::Uninitialized => Ok(())
+        }
+    }
+}
+
+pub static mut VIDEO_MODE: VideoModes = VideoModes::Uninitialized;
 
 #[macro_export]
 macro_rules! write_tts {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
         use crate::drivers::display::VIDEO_MODE;
-        use crate::drivers::display::VideoModes;
 
         unsafe {
-            match &mut VIDEO_MODE {
-                VideoModes::VgaTextmode(ref mut writer) => writer.write_fmt(format_args!($($arg)*)).unwrap(),
-
-            }
+            VIDEO_MODE.write_fmt(format_args!($($arg)*)).unwrap()
         }
     });
 }
 
 #[macro_export]
 macro_rules! print {
-    ($fmt:expr) => (write_tts!($fmt));
-    ($fmt:expr, $($arg:tt)*) => (write_tts!($fmt, $($arg)*));
+    ($fmt:expr) => (crate::write_tts!($fmt));
+    ($fmt:expr, $($arg:tt)*) => (crate::write_tts!($fmt, $($arg)*));
 }
 
 #[macro_export]
 macro_rules! println {
-    () => (write_tts!("\n"));
-    ($fmt:expr) => (write_tts!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (write_tts!(concat!($fmt, "\n"), $($arg)*));
+    () => (crate::write_tts!("\n"));
+    ($fmt:expr) => (crate::write_tts!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (crate::write_tts!(concat!($fmt, "\n"), $($arg)*));
+}
+
+#[macro_export]
+macro_rules! eprint {
+    ($fmt:expr) => (unsafe {
+        use crate::print;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::LightRed, VgaColor::Black);
+        print!($fmt);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
+    ($fmt:expr, $($arg:tt)*) => (unsafe {
+        use crate::print;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::LightRed, VgaColor::Black);
+        print!($fmt, $($arg)*);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
+}
+
+#[macro_export]
+macro_rules! eprintln {
+    () => (println!());
+    ($fmt:expr) => (unsafe {
+        use crate::println;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::LightRed, VgaColor::Black);
+        println!($fmt);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
+    ($fmt:expr, $($arg:tt)*) => (unsafe {
+        use crate::println;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::LightRed, VgaColor::Black);
+        println!($fmt, $($arg)*);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
+}
+
+#[macro_export]
+macro_rules! wprint {
+    ($fmt:expr) => (unsafe {
+        use crate::print;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::Yellow, VgaColor::Black);
+        print!($fmt);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
+    ($fmt:expr, $($arg:tt)*) => (unsafe {
+        use crate::print;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::Yellow, VgaColor::Black);
+        print!($fmt, $($arg)*);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
+}
+
+#[macro_export]
+macro_rules! wprintln {
+    () => (println!());
+    ($fmt:expr) => (unsafe {
+        use crate::println;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::Yellow, VgaColor::Black);
+        println!($fmt);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
+    ($fmt:expr, $($arg:tt)*) => (unsafe {
+        use crate::println;
+        use crate::drivers::display::VIDEO_MODE;
+        use drivers::display::vga_textmode::VgaColor;
+
+        VIDEO_MODE.set_color(VgaColor::Yellow, VgaColor::Black);
+        println!($fmt, $($arg)*);
+        VIDEO_MODE.set_color(VgaColor::LightGray, VgaColor::Black);
+    });
 }

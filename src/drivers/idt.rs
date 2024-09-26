@@ -1,0 +1,110 @@
+use core::arch::asm;
+use kernel_proc::interrupt;
+use crate::drivers::ports::{inb, outb};
+use crate::print;
+
+#[repr(u8)]
+pub enum InterruptGate {
+    TRAP = 0b10001111,
+    INTERRUPT = 0b10001110
+}
+
+pub type ISRFunction = unsafe extern "C" fn() -> !;
+
+#[repr(C, packed)]
+#[derive(Default, Copy, Clone)]
+struct IDTEntry {
+    handler_low: u16,
+    selector: u16,
+    zero: u8,
+    attributes: u8,
+    handler_high: u16
+}
+
+impl IDTEntry {
+    fn new(gate_type: InterruptGate, handler: ISRFunction) -> Self {
+        Self {
+            handler_low: ((handler as u32) & 0xFFFF) as u16,
+            selector: 0x08,
+            zero: 0,
+            attributes: gate_type as u8,
+            handler_high: (((handler as u32) >> 16) & 0xFFFF) as u16
+        }
+    }
+}
+
+#[repr(C, packed)]
+pub struct IDT([IDTEntry;256]);
+
+impl IDT {
+    pub fn new() -> Self {
+        Self {
+            0: [IDTEntry::default();256]
+        }
+    }
+
+    pub fn register_isr(&mut self, idx: usize, handler: ISRFunction) {
+        self.0[idx] = IDTEntry::new(InterruptGate::INTERRUPT, handler);
+    }
+
+    pub fn register_default_isr(&mut self) {
+        self.register_isr(0x20, pic_isr);
+        self.register_isr(0x21, keyboard_isr);
+        self.register_isr(0x22, pic_isr);
+        self.register_isr(0x23, pic_isr);
+        self.register_isr(0x24, pic_isr);
+        self.register_isr(0x25, pic_isr);
+        self.register_isr(0x26, pic_isr);
+        self.register_isr(0x27, pic_isr);
+
+        self.register_isr(0x28, pic2_isr);
+        self.register_isr(0x29, pic2_isr);
+        self.register_isr(0x2A, pic2_isr);
+        self.register_isr(0x2B, pic2_isr);
+        self.register_isr(0x2C, pic2_isr);
+        self.register_isr(0x2D, pic2_isr);
+        self.register_isr(0x2E, pic2_isr);
+        self.register_isr(0x2F, pic2_isr);
+    }
+
+    pub fn load(&self) {
+        #[repr(C, packed)]
+        struct IDTPtr {
+            limit: u16,
+            base: u32
+        }
+
+        let idt_ptr = IDTPtr {
+            limit: (size_of::<IDTEntry>() as u16 * 256) - 1,
+            base: self as *const _ as u32
+        };
+
+        unsafe {
+            asm!(
+                "lidt [{}]",
+                "sti",
+                in(reg) &idt_ptr,
+                options(nostack)
+            )
+        }
+    }
+}
+
+#[interrupt]
+fn pic_isr() {
+    outb(0x20, 0x20);
+}
+
+#[interrupt]
+fn pic2_isr() {
+    outb(0xA0, 0x20);
+}
+
+#[interrupt]
+fn keyboard_isr() {
+    outb(0x20, 0x20);
+
+    let scancode = inb(0x60);
+
+    print!("well aren't you special");
+}
