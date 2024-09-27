@@ -1,5 +1,5 @@
 use core::fmt;
-use crate::drivers::ports::outb;
+use crate::drivers::ports::{inb, outb};
 
 const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
 const BUFFER_HEIGHT: usize = 25;
@@ -68,11 +68,11 @@ impl VGABufferWriter {
             }
         }
 
-        let offset = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+        let offset = ((self.row_position * BUFFER_WIDTH) + self.column_position) as u16;
         outb(CURSOR_CONTROL_PORT, 0x0E);
-        outb(CURSOR_DATA_PORT, (offset >> 8) as u8);
+        outb(CURSOR_DATA_PORT, ((offset >> 8) & 0xFF) as u8);
         outb(CURSOR_CONTROL_PORT, 0x0F);
-        outb(CURSOR_DATA_PORT, offset as u8);
+        outb(CURSOR_DATA_PORT, (offset & 0xFF) as u8);
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -127,9 +127,9 @@ impl VGABufferWriter {
 
     fn enable_cursor() {
         outb(CURSOR_CONTROL_PORT, 0x0A);
-        outb(CURSOR_DATA_PORT, 0);
+        outb(CURSOR_DATA_PORT, (inb(CURSOR_DATA_PORT) & 0xC0) | 0);
         outb(CURSOR_CONTROL_PORT, 0x0B);
-        outb(CURSOR_DATA_PORT, 16);
+        outb(CURSOR_DATA_PORT, (inb(CURSOR_DATA_PORT) & 0xE0) | 15);
     }
 
     fn disable_cursor() {

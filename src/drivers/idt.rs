@@ -1,5 +1,6 @@
 use core::arch::asm;
 use kernel_proc::interrupt;
+use crate::drivers::io::keyboard_isr;
 use crate::drivers::ports::{inb, outb};
 use crate::print;
 
@@ -16,31 +17,35 @@ pub type ISRFunction = unsafe extern "C" fn() -> !;
 struct IDTEntry {
     handler_low: u16,
     selector: u16,
-    zero: u8,
+    ist: u8,
     attributes: u8,
-    handler_high: u16
+    handler_mid: u16,
+    handler_high: u32,
+    zero: u32
 }
 
 impl IDTEntry {
     fn new(gate_type: InterruptGate, handler: ISRFunction) -> Self {
+        let handler = handler as u64;
+
         Self {
-            handler_low: ((handler as u32) & 0xFFFF) as u16,
+            handler_low: (handler & 0xFFFF) as u16,
             selector: 0x08,
             zero: 0,
             attributes: gate_type as u8,
-            handler_high: (((handler as u32) >> 16) & 0xFFFF) as u16
+            handler_mid: ((handler >> 16) & 0xFFFF) as u16,
+            handler_high: ((handler >> 32) & 0xFFFFFFFF) as u32,
+            ist: 0 // TODO: change this to use a specific stack for each interrupt
         }
     }
 }
 
-#[repr(C, packed)]
+#[repr(C, align(16))]
 pub struct IDT([IDTEntry;256]);
 
 impl IDT {
     pub fn new() -> Self {
-        Self {
-            0: [IDTEntry::default();256]
-        }
+        Self([IDTEntry::default();256])
     }
 
     pub fn register_isr(&mut self, idx: usize, handler: ISRFunction) {
@@ -71,12 +76,12 @@ impl IDT {
         #[repr(C, packed)]
         struct IDTPtr {
             limit: u16,
-            base: u32
+            base: u64
         }
 
         let idt_ptr = IDTPtr {
             limit: (size_of::<IDTEntry>() as u16 * 256) - 1,
-            base: self as *const _ as u32
+            base: self as *const _ as u64
         };
 
         unsafe {
@@ -98,13 +103,4 @@ fn pic_isr() {
 #[interrupt]
 fn pic2_isr() {
     outb(0xA0, 0x20);
-}
-
-#[interrupt]
-fn keyboard_isr() {
-    outb(0x20, 0x20);
-
-    let scancode = inb(0x60);
-
-    print!("well aren't you special");
 }

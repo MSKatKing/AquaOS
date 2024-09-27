@@ -10,7 +10,7 @@ use kernel_proc::interrupt;
 use crate::drivers::display::{VideoModes, VIDEO_MODE};
 use crate::drivers::display::vga_textmode::VGABufferWriter;
 use crate::drivers::idt::IDT;
-use crate::drivers::ports::outb;
+use crate::drivers::ports::{inb, outb};
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -35,7 +35,7 @@ pub extern "C" fn _start() -> ! {
 
     let mut idt = IDT::new();
     idt.register_default_isr();
-    //idt.load();
+    idt.load();
 
     println!("Welcome to the AquaOS kernel!");
     println!("Type '?' for a list of commands.");

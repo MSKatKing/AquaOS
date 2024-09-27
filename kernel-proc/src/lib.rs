@@ -20,7 +20,7 @@ pub fn interrupt(_attr: TokenStream, item: TokenStream) -> TokenStream {
             unsafe {
                 core::arch::asm!(
                     "call {}",
-                    "iret",
+                    "iretq",
                     sym internals,
                     options(noreturn, att_syntax)
                 );
