@@ -1,8 +1,8 @@
 use core::arch::asm;
 use kernel_proc::interrupt;
 use crate::drivers::io::keyboard_isr;
-use crate::drivers::ports::{inb, outb};
-use crate::print;
+use crate::drivers::ports::Port;
+use crate::drivers::timing::pit_interrupt_handler;
 
 #[repr(u8)]
 pub enum InterruptGate {
@@ -53,7 +53,7 @@ impl IDT {
     }
 
     pub fn register_default_isr(&mut self) {
-        self.register_isr(0x20, pic_isr);
+        self.register_isr(0x20, pit_interrupt_handler);
         self.register_isr(0x21, keyboard_isr);
         self.register_isr(0x22, pic_isr);
         self.register_isr(0x23, pic_isr);
@@ -97,10 +97,10 @@ impl IDT {
 
 #[interrupt]
 fn pic_isr() {
-    outb(0x20, 0x20);
+    Port::new(0x20).write(0x20u8);
 }
 
 #[interrupt]
 fn pic2_isr() {
-    outb(0xA0, 0x20);
+    Port::new(0xA0).write(0x20u8);
 }

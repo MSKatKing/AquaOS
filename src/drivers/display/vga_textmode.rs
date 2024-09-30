@@ -1,12 +1,12 @@
 use core::fmt;
-use crate::drivers::ports::{inb, outb};
+use crate::drivers::ports::Port;
 
 const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
-const CURSOR_CONTROL_PORT: u16 = 0x3D4;
-const CURSOR_DATA_PORT: u16 = 0x3D5;
+const CURSOR_CONTROL_PORT: Port = Port::new(0x3D4);
+const CURSOR_DATA_PORT: Port = Port::new(0x3D5);
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
@@ -69,10 +69,10 @@ impl VGABufferWriter {
         }
 
         let offset = ((self.row_position * BUFFER_WIDTH) + self.column_position) as u16;
-        outb(CURSOR_CONTROL_PORT, 0x0E);
-        outb(CURSOR_DATA_PORT, ((offset >> 8) & 0xFF) as u8);
-        outb(CURSOR_CONTROL_PORT, 0x0F);
-        outb(CURSOR_DATA_PORT, (offset & 0xFF) as u8);
+        CURSOR_CONTROL_PORT.write(0x0Eu8);
+        CURSOR_DATA_PORT.write(((offset >> 8) & 0xFF) as u8);
+        CURSOR_CONTROL_PORT.write(0x0Fu8);
+        CURSOR_DATA_PORT.write((offset & 0xFF) as u8);
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -119,22 +119,22 @@ impl VGABufferWriter {
         let high = (new >> 8) as u8;
         let low = (new & 0xFF) as u8;
 
-        outb(0x3D4, 0x0C);
-        outb(0x3D5, high);
-        outb(0x3D4, 0x0D);
-        outb(0x3D5, low);
+        CURSOR_CONTROL_PORT.write(0x0Cu8);
+        CURSOR_DATA_PORT.write(high);
+        CURSOR_CONTROL_PORT.write(0x0Du8);
+        CURSOR_DATA_PORT.write(low);
     }
 
     fn enable_cursor() {
-        outb(CURSOR_CONTROL_PORT, 0x0A);
-        outb(CURSOR_DATA_PORT, (inb(CURSOR_DATA_PORT) & 0xC0) | 0);
-        outb(CURSOR_CONTROL_PORT, 0x0B);
-        outb(CURSOR_DATA_PORT, (inb(CURSOR_DATA_PORT) & 0xE0) | 15);
+        CURSOR_CONTROL_PORT.write(0x0Au8);
+        CURSOR_DATA_PORT.write((CURSOR_DATA_PORT.read::<u8>() & 0xC0) | 0);
+        CURSOR_CONTROL_PORT.write(0x0Bu8);
+        CURSOR_DATA_PORT.write((CURSOR_DATA_PORT.read::<u8>() & 0xE0) | 15);
     }
 
     fn disable_cursor() {
-        outb(CURSOR_CONTROL_PORT, 0x0A);
-        outb(CURSOR_DATA_PORT, 0x20);
+        CURSOR_CONTROL_PORT.write(0x0Au8);
+        CURSOR_DATA_PORT.write(0x20u8);
     }
 }
 
