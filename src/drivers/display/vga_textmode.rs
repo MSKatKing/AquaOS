@@ -52,6 +52,7 @@ impl VGABufferWriter {
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            8 => self.backspace(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -62,6 +63,7 @@ impl VGABufferWriter {
                 unsafe {
                     *VGA_BUFFER.offset(offset as isize * 2) = byte;
                     *VGA_BUFFER.offset(offset as isize * 2 + 1) = self.color_code;
+                    *VGA_BUFFER.offset((offset + 1) as isize * 2 + 1) = self.color_code;
                 }
 
                 self.column_position += 1;
@@ -78,10 +80,22 @@ impl VGABufferWriter {
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                0x20..=0x7e | b'\n' | 8 => self.write_byte(byte),
                 _ => self.write_byte(0xfe),
             }
         }
+    }
+
+    fn backspace(&mut self) {
+        if self.column_position == 0 {
+            return;
+        }
+
+        self.column_position -= 1;
+
+        self.write_byte(0);
+
+        self.column_position -= 1;
     }
 
     fn new_line(&mut self) {

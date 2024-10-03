@@ -2,17 +2,21 @@
 #![no_main]
 #![allow(static_mut_refs)]
 #![feature(naked_functions)]
+#![feature(allocator_api)]
 
 pub mod drivers;
 mod memory;
 
+extern crate alloc;
+
+use core::arch::asm;
 use core::panic::PanicInfo;
 use kernel_proc::interrupt;
 use crate::drivers::display::{VideoModes, VIDEO_MODE};
 use crate::drivers::display::vga_textmode::VGABufferWriter;
 use crate::drivers::idt::IDT;
 use crate::drivers::ports::Port;
-use crate::drivers::timing::{configure_pit, current_time};
+use crate::drivers::timing::configure_pit;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -32,8 +36,8 @@ pub extern "C" fn _start() -> ! {
     p21.write(0x01u8);
     pa1.write(0x01u8);
 
-    p21.write(0xFCu8);
-    pa1.write(0xFFu8);
+    p21.write(0x00u8);
+    pa1.write(0x00u8);
 
     Port::new(0x64).write(0xAEu8);
     Port::new(0x60).write(0xF4u8);
@@ -48,12 +52,13 @@ pub extern "C" fn _start() -> ! {
     println!("Type '?' for a list of commands.");
     print!("> ");
 
-    let (seconds, minutes, hours, day, month, year) = current_time();
+    timeout!(|| false, Duration::from_millis(50));
 
-    println!("Current Time: {:02}:{:02}:{:02} - Date: {:02}/{:02}/{:04}",
-        hours, minutes, seconds, month, day, year);
-
-    loop {}
+    loop {
+        unsafe {
+            asm!("hlt");
+        }
+    }
 }
 
 #[panic_handler]

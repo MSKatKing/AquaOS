@@ -1,6 +1,6 @@
 use core::arch::asm;
 use kernel_proc::interrupt;
-use crate::drivers::io::keyboard_isr;
+use crate::drivers::io::keyboard::keyboard_isr;
 use crate::drivers::ports::Port;
 use crate::drivers::timing::pit_interrupt_handler;
 

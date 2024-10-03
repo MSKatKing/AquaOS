@@ -5,18 +5,18 @@ use kernel_proc::interrupt;
 use crate::drivers::ports::Port;
 
 const PIT_FREQUENCY: u32 = 1193182;
-const DESIRED_FREQUENCY: u32 = 100;
+const DESIRED_FREQUENCY: u32 = 1000;
 
 pub fn configure_pit() {
     let divisor = PIT_FREQUENCY / DESIRED_FREQUENCY;
 
-        let command_port = Port::new(0x43);
-        let channel_0_data_port = Port::new(0x40);
+    let command_port = Port::new(0x43);
+    let channel_0_data_port = Port::new(0x40);
 
-        command_port.write(0x36u8);
+    command_port.write(0x36u8);
 
-        channel_0_data_port.write((divisor & 0xFF) as u8);
-        channel_0_data_port.write((divisor >> 8) as u8);
+    channel_0_data_port.write((divisor & 0xFF) as u8);
+    channel_0_data_port.write((divisor >> 8) as u8);
 }
 
 static TICKS: AtomicU64 = AtomicU64::new(0);
@@ -31,12 +31,8 @@ pub fn pit_interrupt_handler() {
 pub fn sleep(time: Duration) {
     TICKS.store(0, Ordering::Relaxed);
 
-    let ticks_per_ms = DESIRED_FREQUENCY as u64 / 1000;
-    let start_ticks = TICKS.load(Ordering::Relaxed);
-    let target_ticks = start_ticks + (time.as_millis() as u64 * ticks_per_ms);
-
-    while TICKS.load(Ordering::Relaxed) < target_ticks {
-        unsafe { asm!("nop") }
+    while TICKS.load(Ordering::Relaxed) < time.as_millis() as u64 {
+        unsafe { asm!("hlt") }
     }
 }
 
@@ -79,4 +75,29 @@ pub fn current_time() -> (u8, u8, u8, u8, u8, u16) {
     }
 
     (seconds, minutes, hours, days, months, 2000 + (years as u16))
+}
+
+#[macro_export]
+macro_rules! timeout {
+    ($func:expr, $duration:expr) => ({
+        use crate::drivers::timing::sleep;
+        use core::time::Duration;
+
+        fn test(_a: impl Fn() -> bool, _b: Duration) {}
+
+        test($func, $duration);
+
+        let mut timeout = $duration.as_millis() as u64;
+
+        while timeout > 0 {
+            if $func() {
+                break;
+            }
+
+            sleep(Duration::from_millis(1));
+            timeout -= 1;
+        }
+
+        if timeout == 0 { panic!("Expression timed out"); }
+    });
 }

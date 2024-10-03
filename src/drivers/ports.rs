@@ -1,10 +1,10 @@
 use core::arch::asm;
 
-trait PortRead {
+pub trait PortRead {
     fn port_read(port: u16) -> Self;
 }
 
-trait PortWrite {
+pub trait PortWrite {
     fn port_write(&self, port: u16);
 }
 
