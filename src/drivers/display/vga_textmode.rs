@@ -1,4 +1,6 @@
 use core::fmt;
+use core::fmt::Write;
+use crate::drivers::display::swappable::{VgaColor, VideoDriver, VideoModeSpecification};
 use crate::drivers::ports::Port;
 
 const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
@@ -8,47 +10,14 @@ const BUFFER_WIDTH: usize = 80;
 const CURSOR_CONTROL_PORT: Port = Port::new(0x3D4);
 const CURSOR_DATA_PORT: Port = Port::new(0x3D5);
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-pub enum VgaColor {
-    Black = 0,
-    Blue = 1,
-    Green = 2,
-    Cyan = 3,
-    Red = 4,
-    Magenta = 5,
-    Brown = 6,
-    LightGray = 7,
-    DarkGray = 8,
-    LightBlue = 9,
-    LightGreen = 10,
-    LightCyan = 11,
-    LightRed = 12,
-    Pink = 13,
-    Yellow = 14,
-    White = 15,
-}
-
-pub struct VGABufferWriter {
+pub struct AquaOSVGATextmodeVideoDriver {
     column_position: usize,
     row_position: usize,
     color_code: u8,
     start_row: u16
 }
 
-impl VGABufferWriter {
-    pub fn new() -> Self {
-        Self::disable_cursor();
-        Self::enable_cursor();
-
-        VGABufferWriter {
-            column_position: 0,
-            row_position: 0,
-            color_code: 0x07,
-            start_row: 0
-        }
-    }
-
+impl AquaOSVGATextmodeVideoDriver {
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -107,10 +76,6 @@ impl VGABufferWriter {
         }
     }
 
-    pub fn set_color(&mut self, foreground: VgaColor, background: VgaColor) {
-        self.color_code = ((background as u8 & 0xF) << 4) | (foreground as u8 & 0xF);
-    }
-
     fn scroll_up(&mut self) -> bool {
         if self.start_row > 0 {
             false
@@ -152,9 +117,50 @@ impl VGABufferWriter {
     }
 }
 
-impl fmt::Write for VGABufferWriter {
+impl Write for AquaOSVGATextmodeVideoDriver {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
         Ok(())
+    }
+}
+
+impl VideoDriver for AquaOSVGATextmodeVideoDriver {
+    unsafe fn create() -> Result<&'static mut Self, &'static str> {
+        static mut SELF: AquaOSVGATextmodeVideoDriver = AquaOSVGATextmodeVideoDriver {
+            column_position: 0,
+            row_position: 0,
+            color_code: 0x07,
+            start_row: 0
+        };
+
+        Ok(&mut SELF)
+    }
+
+    fn initialize(&self) -> Result<(), &str> {
+        Self::disable_cursor();
+        Self::enable_cursor();
+
+        Ok(())
+    }
+
+    fn name(&self) -> &str {
+        "AquaOS' 80x25 VGA Textmode Driver (os-provided)"
+    }
+
+    fn supported_display_modes(&self) -> &[(&str, VideoModeSpecification)] {
+        static MODES: [(&str, VideoModeSpecification);2] = [
+            ("80x25 VGA Textmode (16 color)", VideoModeSpecification::from(true, 80, 25, 15)),
+            ("80x25 VGA Textmode (mono color)", VideoModeSpecification::from(true, 80, 25, 0))
+        ];
+
+        &MODES
+    }
+
+    fn clear_screen(&self) {
+        todo!()
+    }
+
+    fn set_color(&mut self, foreground: VgaColor, background: VgaColor) {
+        self.color_code = ((background as u8 & 0xF) << 4) | (foreground as u8 & 0xF);
     }
 }

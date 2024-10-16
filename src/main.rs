@@ -12,15 +12,15 @@ extern crate alloc;
 use core::arch::asm;
 use core::panic::PanicInfo;
 use kernel_proc::interrupt;
-use crate::drivers::display::{VideoModes, VIDEO_MODE};
-use crate::drivers::display::vga_textmode::VGABufferWriter;
+use crate::drivers::display::VIDEO_DRIVER;
+use crate::drivers::display::vga_textmode::AquaOSVGATextmodeVideoDriver;
 use crate::drivers::idt::IDT;
 use crate::drivers::ports::Port;
 use crate::drivers::timing::configure_pit;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    unsafe { VIDEO_MODE = VideoModes::VgaTextmode(VGABufferWriter::new()); }
+    change_video_driver!(AquaOSVGATextmodeVideoDriver);
 
     // Remap the PIC to make sure that it uses the correct ISR handlers
     Port::new(0x20).write(0x11u8);
@@ -46,13 +46,14 @@ pub extern "C" fn _start() -> ! {
     idt.register_default_isr();
     idt.load();
 
+    Port::new(0x3C0).write::<u8>(0x08);
+    println!("{}", Port::new(0x3C0).read::<u8>());
+
     configure_pit();
 
     println!("Welcome to the AquaOS kernel!");
     println!("Type '?' for a list of commands.");
     print!("> ");
-
-    timeout!(|| false, Duration::from_millis(50));
 
     loop {
         unsafe {

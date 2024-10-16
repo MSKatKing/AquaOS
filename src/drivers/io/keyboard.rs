@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use kernel_proc::interrupt;
 use crate::drivers::ports::Port;
 use crate::print;
